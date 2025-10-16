@@ -1,5 +1,14 @@
 cmake_minimum_required(VERSION 4.0.1 FATAL_ERROR)
 
-project(BattleCity)
+set(PROJECT_NAME BattleCity)
+project(${PROJECT_NAME})
 
-add_executable(BattleCity src/main.cpp)
+add_executable(${PROJECT_NAME} src/main.cpp)
+
+SET(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
+SET(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+SET(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+SET(GLFW_INSTALL OFF CACHE BOOL "" FORCE)
+
+add_subdirectory(external/glfw)
+target_link_libraries(${PROJECT_NAME} glfw)
