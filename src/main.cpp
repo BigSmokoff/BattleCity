@@ -5,6 +5,37 @@
 int g_windowSizeX = 640;
 int g_windowSizeY = 480;
 
+GLfloat point[] = {
+    0.0f, 0.5f, 0.0f,
+    0.5f, -0.5f, 0.0f,
+    -0.5f, -0.5f, 0.0f
+};
+
+GLfloat colors[] = {
+    1.0f, 0.0f, 0.0f, // красный
+    0.0f, 1.0f, 0.0f, // зелЄный
+    0.0f, 0.0f, 1.0f  // синий
+};
+
+// in входна€ переменна€, out переменна€ на выход
+const char* vertex_shader =
+"#version 460\n" // верси€ шейдера которую будем использовать
+"layout(location = 0) in vec3 vertex_postion;" // входные данные которые получает наш шейдер (позици€ vertex и color)
+"layout(location = 1) in vec3 vertex_color;" // дл€ правильной установки данных шейдеру нужно указать позицию где их искать = layout
+"out vec3 color;"
+"void main() {"
+"   color = vertex_color;" // устанавливаем значение на выход дл€ дальнейшей интерпол€ции
+"   gl_Position = vec4(vertex_postion, 1.0);" // обозначает позицию vertex который идет на выход в нормированном виде
+"}"; // это мини программка будет запускатьс€ столько раз сколько у нас vertex
+
+const char* fragment_shader =
+"#version 460\n"
+"in vec3 color;"
+"out vec4 frag_color;"
+"void main() {"
+"   frag_color = vec4(color, 1.0);" // устанавливаем интерполированное значение фрагментному цвету
+"}";
+
 void glfwWindowSizeCallback(GLFWwindow* pWindow, int width, int heigth)
 {
     g_windowSizeX = width;
@@ -41,7 +72,9 @@ int main(void)
         return -1;
     }
 
+    // функци€ регистрируща€ обработчик изменений размера окна
     glfwSetWindowSizeCallback(pWindow, glfwWindowSizeCallback);
+    // функци€ регистрируща€ обработчик нажатий
     glfwSetKeyCallback(pWindow, glfwKeyCallback);
     
     // делаем окно текущим
@@ -56,7 +89,77 @@ int main(void)
 	std::cout << "Renderer: " << glGetString(GL_RENDERER) << std::endl;
 	std::cout << "OpenGL version: " << glGetString(GL_VERSION) << std::endl;
 	
-	glClearColor(0, 1, 0, 1);
+	glClearColor(0, 1, 1, 1);
+
+    // создаем, компилируем, линкуем и удал€ем шейдеры
+    GLint success;
+    GLchar infoLog[512];
+
+    GLuint vs = glCreateShader(GL_VERTEX_SHADER); // создаем идентификатор дл€ шейдера
+    glShaderSource(vs, 1, &vertex_shader, nullptr);
+    glCompileShader(vs);
+
+    glGetShaderiv(vs, GL_COMPILE_STATUS, &success);
+    if (!success) {
+        glGetShaderInfoLog(vs, 512, nullptr, infoLog);
+        std::cout << "Error compiling vertex shader:\n" << infoLog << std::endl;
+    }
+
+    GLuint fs = glCreateShader(GL_FRAGMENT_SHADER); // создаем идентификатор дл€ шейдера
+    glShaderSource(fs, 1, &fragment_shader, nullptr);
+    glCompileShader(fs);
+
+    glGetShaderiv(fs, GL_COMPILE_STATUS, &success);
+    if (!success) {
+        glGetShaderInfoLog(fs, 512, nullptr, infoLog);
+        std::cout << "Error compiling colors shader:\n" << infoLog << std::endl;
+    }
+
+    GLuint shader_program = glCreateProgram();
+    glAttachShader(shader_program, vs);
+    glAttachShader(shader_program, fs);
+    glLinkProgram(shader_program);
+
+    glDeleteShader(vs);
+    glDeleteShader(fs);
+
+    // передача необходимых параметров дл€ шейдеров в пам€ть видеокарты с помощью vbo (vertex buffer obj)
+    GLuint points_vbo = 0;
+    glGenBuffers(1, &points_vbo); // драйвер при вызове этой команды создает 1 vbo и записывает по адресу
+    glBindBuffer(GL_ARRAY_BUFFER, points_vbo); // подключаем его
+    glBufferData(GL_ARRAY_BUFFER, sizeof(point), point, GL_STATIC_DRAW); // отправл€ем в него данные, с меткой
+
+    GLuint colors_vbo = 0;
+    glGenBuffers(1, &colors_vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, colors_vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(colors), colors, GL_STATIC_DRAW);
+
+    GLuint vao = 0; // VAO не хранит сами данные, он запоминает св€зи между шейдерами и буферами.
+    glGenVertexArrays(1, &vao);
+    glBindVertexArray(vao);
+
+    glEnableVertexAttribArray(0); // Ќастраиваем атрибут 0 Ч позиции
+    glBindBuffer(GL_ARRAY_BUFFER, points_vbo);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
+    /*
+    0 Ч номер атрибута (layout).
+    3 Ч по 3 floatТа на вершину (x, y, z).
+    GL_FLOAT Ч тип данных.
+    GL_FALSE Ч не нужно нормализовать.
+    0 Ч нет промежутков между вершинами (строго подр€д).
+    nullptr Ч начинаем с начала буфера.
+    */
+
+    glEnableVertexAttribArray(1);
+    glBindBuffer(GL_ARRAY_BUFFER, colors_vbo);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
+
+
+    /*
+    VBO хран€т Усырые данныеФ на GPU.
+    VAO хранит Укак эти данные читатьФ.
+    Shader Program ожидает атрибуты layout(0) и layout(1).
+    */
 
     // игровой цикл, пока окно не закроетс€
     while (!glfwWindowShouldClose(pWindow))
@@ -64,10 +167,14 @@ int main(void)
         // ќчищаем один буфер (рендерим)
         glClear(GL_COLOR_BUFFER_BIT);
 
+        glUseProgram(shader_program); // ЅерЄт активную программу (шейдеры),
+        glBindVertexArray(vao);
+        glDrawArrays(GL_TRIANGLES, 0, 3);
+
         // ћен€ем местами передний и задний буфер
         glfwSwapBuffers(pWindow);
 
-        /* Poll for and process events */
+        // ќбрабатываем пользовательские команды
         glfwPollEvents();
     }
 
