@@ -1,6 +1,7 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <iostream>
+#include "Renderer/ShaderProgram.h"
 
 int g_windowSizeX = 640;
 int g_windowSizeY = 480;
@@ -54,35 +55,32 @@ void glfwKeyCallback(GLFWwindow* window, int key, int scancode, int action, int 
 int main(void)
 {
     // инициализируем библиотеку
-    if (!glfwInit())
+    if (!glfwInit()) 
         return -1;
 
-    // создание контекста openGL (если версия меньше чем 4.6, то мы не сможешь создать окно)
+    // создание контекста OpenGL (если версия меньше чем 4.6, то мы не сможем создать окно)
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
-    // используем core-profile (поднмножество функций openGL)
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE); // используем core-profile (поднмножество функций OpenGL)
 
     // создаем окно в оконном режиме
     GLFWwindow* pWindow; pWindow = glfwCreateWindow(g_windowSizeX, g_windowSizeY, "Battle City", nullptr, nullptr);
     if (!pWindow)
     {
-        std::cout << "glfwCreateWindow failed!" << std::endl;
+        std::cerr << "glfwCreateWindow failed!" << std::endl;
         glfwTerminate();
         return -1;
     }
 
-    // функция регистрирущая обработчик изменений размера окна
-    glfwSetWindowSizeCallback(pWindow, glfwWindowSizeCallback);
-    // функция регистрирущая обработчик нажатий
-    glfwSetKeyCallback(pWindow, glfwKeyCallback);
+    glfwSetWindowSizeCallback(pWindow, glfwWindowSizeCallback); // функция регистрирущая обработчик изменений размера окна
+    glfwSetKeyCallback(pWindow, glfwKeyCallback); // функция регистрирущая обработчик нажатий
     
     // делаем окно текущим
     glfwMakeContextCurrent(pWindow);
 	
 	if (!gladLoadGL())
     {
-		std::cout << "Can't load GLAD" << std::endl;
+		std::cerr << "Can't load GLAD" << std::endl;
         return -1;
     }
 	
@@ -91,37 +89,14 @@ int main(void)
 	
 	glClearColor(0, 1, 1, 1);
 
-    // создаем, компилируем, линкуем и удаляем шейдеры
-    GLint success;
-    GLchar infoLog[512];
-
-    GLuint vs = glCreateShader(GL_VERTEX_SHADER); // создаем идентификатор для шейдера
-    glShaderSource(vs, 1, &vertex_shader, nullptr);
-    glCompileShader(vs);
-
-    glGetShaderiv(vs, GL_COMPILE_STATUS, &success);
-    if (!success) {
-        glGetShaderInfoLog(vs, 512, nullptr, infoLog);
-        std::cout << "Error compiling vertex shader:\n" << infoLog << std::endl;
+    std::string vertexShader(vertex_shader);
+    std::string fragemntShader(fragment_shader);
+    Renderer::ShaderProgram shaderProgram(vertexShader, fragemntShader);
+    if (shaderProgram.isCompiled())
+    {
+        std::cerr << "Can't create shader program!" << std::endl;
+        return -1;
     }
-
-    GLuint fs = glCreateShader(GL_FRAGMENT_SHADER); // создаем идентификатор для шейдера
-    glShaderSource(fs, 1, &fragment_shader, nullptr);
-    glCompileShader(fs);
-
-    glGetShaderiv(fs, GL_COMPILE_STATUS, &success);
-    if (!success) {
-        glGetShaderInfoLog(fs, 512, nullptr, infoLog);
-        std::cout << "Error compiling colors shader:\n" << infoLog << std::endl;
-    }
-
-    GLuint shader_program = glCreateProgram();
-    glAttachShader(shader_program, vs);
-    glAttachShader(shader_program, fs);
-    glLinkProgram(shader_program);
-
-    glDeleteShader(vs);
-    glDeleteShader(fs);
 
     // передача необходимых параметров для шейдеров в память видеокарты с помощью vbo (vertex buffer obj)
     GLuint points_vbo = 0;
@@ -167,9 +142,14 @@ int main(void)
         // Очищаем один буфер (рендерим)
         glClear(GL_COLOR_BUFFER_BIT);
 
-        glUseProgram(shader_program); // Берёт активную программу (шейдеры),
+        shaderProgram.use();
         glBindVertexArray(vao);
         glDrawArrays(GL_TRIANGLES, 0, 3);
+        /*
+        GL_TRIANGLES Это тип примитива, который OpenGL должен нарисовать.
+        0 Это индекс первой вершины, с которой начинать рисование.
+        3 Это количество вершин, которые нужно отрисовать, начиная с first.
+        */
 
         // Меняем местами передний и задний буфер
         glfwSwapBuffers(pWindow);
